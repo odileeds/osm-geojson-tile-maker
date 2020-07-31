@@ -1,0 +1,13 @@
+{
+	"bins": {
+		"make": true,
+		"tags": "amenity=waste_basket =recycling",
+		"odir": "tiles/bins/",
+		"zoom": 12
+	},
+	"trees": {
+		"tags": "natural=tree",
+		"odir": "tiles/trees/",
+		"zoom": 12
+	}
+}
