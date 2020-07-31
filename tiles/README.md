@@ -144,7 +144,7 @@ First we use `config.json` to specify the layers we are making:
 	"bins": {
 		"make": true,
 		"tags": "amenity=waste_basket =recycling",
-		"odir": "osmedit/bins/data/",
+		"odir": "tiles/bins/",
 		"zoom": 12
 	}
 }

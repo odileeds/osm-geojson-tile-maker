@@ -26,7 +26,7 @@ use ODILeeds::Tiler;
 
 my (%data,$i,$k,$v,$json,$jsonbit,$coder,$coderu,$str,$slice,$timestamp,$convert,$filter,$planet,$mode,$file,$filepbf,$filegeo,$ogr,@lines,$line,$tiler,%tiles,@types,$n,$zoom,$odir,$ini,@props,$p,$x,$y,$t,$feature,$tile,$ntiles,$progress);
 
-my $datadir = $basedir."osmdata/";
+my $datadir = $basedir."osm/";
 my $tempdir = $basedir."temp/";
 
 if(-e $basedir.".osm_lock"){
