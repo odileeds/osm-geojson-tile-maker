@@ -154,14 +154,14 @@ The `tags` key contains the `osmfilter` format tags you wish to keep; in this ca
 
 This perl script will:
 
-* check for the filtered version of the planet (e.g. `osmdata/bins.o5m`) and create it if it doesn't exist - that will take a few hours but should only need to be done once;
+* check for the filtered version of the planet (e.g. `osm/bins.o5m`) and create it if it doesn't exist - that will take a few hours but should only need to be done once;
 * download the daily change file into a `temp/` subdirectory;
 * uncompress the daily change file;
 * run `osmfilter` on the change file to extract only the necessary tags and save these to a new change file (e.g. `temp/XXXX-bins.osc` where `XXXX` is the sequence number);
 * run `osmconvert` to combine the daily change with the filtered planet;
-* run `osmconvert` to create a `osmdata/bins.osm.pbf` file;
-* run `ogr2ogr` to create a `osmdata/bins.geojson` file;
-* read each feature of `osmdata/bins.geojson` and work out which map tile it is part of;
+* run `osmconvert` to create a `osm/bins.osm.pbf` file;
+* run `ogr2ogr` to create a `osm/bins.geojson` file;
+* read each feature of `osm/bins.geojson` and work out which map tile it is part of;
 * save all the map tiles to the `odir` specified in `config.json`.
 
 
