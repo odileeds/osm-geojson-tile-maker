@@ -142,13 +142,13 @@ First we use `config.json` to specify the layers we are making:
 	"bins": {
 		"make": true,
 		"tags": "amenity=waste_basket =recycling",
-		"odir": "tiles/bins/",
+		"odir": "../osm-geojson/tiles/bins/",
 		"zoom": 12
 	}
 }
 ```
 
-The `tags` key contains the `osmfilter` format tags you wish to keep; in this case `amenity=waste_basket` and `amenity=recycling`. `odir` is the directory to save the resulting GeoJSON tiles to. We set up a cronjob to run the following command once a day:
+The `tags` key contains the `osmfilter` format tags you wish to keep; in this case `amenity=waste_basket` and `amenity=recycling`. `odir` is the directory to save the resulting GeoJSON tiles to - in this case we are saving to the ODI Leeds [osm-geojson repo](https://github.com/odileeds/osm-geojson). We set up a cronjob to run the following command once a day:
 
 `perl /PATH/TO/update.pl -mode update`
 
