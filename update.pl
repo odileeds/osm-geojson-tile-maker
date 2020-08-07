@@ -2,7 +2,7 @@
 ################
 # OSM tile layer updater.
 # Created:      2020-07-27
-# Last updated: 2020-07-29
+# Last updated: 2020-08-07
 #
 # perl update.pl -mode update
 # perl update.pl -mode info
@@ -24,7 +24,7 @@ use ODILeeds::ProgressBar;
 use ODILeeds::Tiler;
 
 
-my (%data,$i,$k,$v,$json,$jsonbit,$coder,$coderu,$str,$slice,$timestamp,$convert,$filter,$planet,$mode,$file,$filepbf,$filegeo,$ogr,@lines,$line,$tiler,%tiles,@types,$n,$zoom,$odir,$ini,@props,$p,$x,$y,$t,$feature,$tile,$ntiles,$progress);
+my (%data,$i,$k,$v,$json,$jsonbit,$coder,$coderu,$str,$slice,$timestamp,$convert,$filter,$planet,$mode,$stats,$file,$filepbf,$filegeo,$ogr,@lines,$line,$tiler,%tiles,@types,$n,$zoom,$odir,$ini,@props,$p,$x,$y,$t,$feature,$tile,$ntiles,$progress);
 
 my $datadir = $basedir."osm/";
 my $tempdir = $basedir."temp/";
@@ -57,6 +57,7 @@ for($i = 0; $i < @ARGV; $i += 2){
 	elsif($k eq "filter"){ $filter = $v; }
 	elsif($k eq "planet"){ $planet = $v; }
 	elsif($k eq "mode"){ $mode = $v; }
+	elsif($k eq "stats"){ $stats = $v; }
 }
 
 # Check for existence of osmctools
@@ -89,7 +90,7 @@ $json = $coder->decode($str);
 
 if($mode eq "info"){
 	# Filter the main planet file to make each slice
-	for $slice (sort(keys(%{$json}))){
+	for $slice (sort(keys(%{$json->{'layers'}}))){
 		$file = $datadir.$slice.".o5m";
 		print "$slice ($file):\n";
 		# We want to find out when it was last updated
@@ -102,9 +103,9 @@ if($mode eq "info"){
 	}
 }elsif($mode eq "update"){
 	# Filter the main planet file to make each slice
-	for $slice (sort(keys(%{$json}))){
+	for $slice (sort(keys(%{$json->{'layers'}}))){
 		print "$slice:\n";
-		if($json->{$slice}{'make'}){
+		if($json->{'layers'}->{$slice}{'make'}){
 			$file = $datadir.$slice.".o5m";
 			if(!-e $file){
 				print "\t$file doesn't exist so we first need to make it from the planet file. Run:\n";
@@ -195,7 +196,7 @@ if($mode eq "info"){
 					open(FILE,">",$file);
 					print FILE "{\n";
 					print FILE "\"type\": \"FeatureCollection\",\n";
-					print FILE "\"lastupdate\": \"".$timestamp."\",\n";
+					#print FILE "\"lastupdate\": \"".$timestamp."\",\n";
 					print FILE "\"features\": [\n";
 					print FILE "$tiles{$tile}\n";
 					print FILE "]\n";
@@ -209,6 +210,155 @@ if($mode eq "info"){
 			}
 		}
 	}
+}
+
+
+if($stats || $mode eq "stats"){
+
+	my (%Areas,$f,$adir,$ddir,$taglist,@tags,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$bbfile,$clipfile,$spat,$nm,$waste,$recycling);
+
+	if(!$json->{'osm-geojson'} || ($json->{'osm-geojson'} && !-d $json->{'osm-geojson'})){
+
+		print "ERROR: Your config.json needs to contain \"osm-geojson\" which should be the path to the \"osm-geojson\" repository.\n";
+		exit;
+	}else{
+		
+		
+		# Find sub directories in areas folder
+		@dirs = ();
+		$ddir = $json->{'osm-geojson'}."boundaries/";
+		print "$ddir\n";
+
+		opendir (DIR,$ddir) or die "Couldn't open directory, $!";
+		while ($cc = readdir DIR){
+			if(-d $ddir.$cc && -d $ddir.$cc && $cc !~ /^\.+$/){
+				#push(@countries,{ 'dir'=>$ddir$cc,'code'=>$file});
+				print "$cc\n";
+				opendir(SUBDIR,$ddir.$cc) or die "Couldn't open directory, $!";
+				while($file = readdir SUBDIR){
+					if($file =~ /^(.*).geojson/){
+						$code = $1;
+						$bbfile = $ddir.$cc."/".$1.".yaml";
+						$clipfile = $ddir.$cc."/".$file;
+						$spat = "";
+						$nm = "";
+						if(-e $bbfile){
+							open(BOUNDS,$bbfile);
+							@lines = <BOUNDS>;
+							close(BOUNDS);
+							foreach $line (@lines){
+								$line =~ s/[\n\r]//g;
+								if($line =~ /BOUNDS: +(.*)/){
+									$spat = "-spat $1";
+								}elsif($line =~ /NAME: +(.*)/){
+									$nm = $1;
+								}
+							}
+							#print "\tUsing $spat for $nm\n";
+						}else{
+							print "\tNo spatial bounds provided for $code (this may be slow)\n";
+						}
+						
+						push(@files,{'code'=>$code,'geojson'=>$clipfile,'cc'=>$cc,'yaml'=>$bbfile,'bounds'=>$spat,'name'=>$nm});
+					}
+				}
+				closedir(SUBDIR);
+			}
+		}
+		closedir(DIR);
+
+		for $slice (sort(keys(%{$json->{'layers'}}))){
+			print "$slice:\n";
+			
+			if($json->{'layers'}->{$slice}{'make'}){
+
+				undef %Areas;
+			
+				$filepbf = $datadir.$slice.".osm.pbf";
+
+				$adir = $json->{'osm-geojson'}."areas/$slice/";
+				if(!-d $adir){
+					print "Making $adir\n";
+					`mkdir $adir`;
+				}
+				
+				$taglist = $json->{'layers'}->{$slice}{'tags'};
+				$taglist =~ s/(^|\s)[^\s]*\=/ /g;
+				@tags = split(" ",$taglist);
+
+				for($f = 0; $f < @files; $f++){
+
+					$file = $adir.$files[$f]{'cc'}."/".$files[$f]{'code'}.".geojson";
+
+					print "Processing $files[$f]{'cc'}/$files[$f]{'code'} - $files[$f]{'name'}\n";
+					print "\tOutput = $file\n";
+					print "\tBoundary file = $files[$f]{'geojson'}\n";
+					print "\tBounds = $files[$f]{'bounds'}\n";
+
+					# Remove any existing version
+					if(-e $file){ `rm $file`; }
+					`ogr2ogr -f GeoJSON $file $files[$f]{'bounds'} -clipsrc "$files[$f]{'geojson'}" -skipfailures $filepbf points`;
+
+					$code = $files[$f]{'code'};
+					$cc = $files[$f]{'cc'};
+					$nm = $files[$f]{'name'};
+					$Areas{$code} = {'cc'=>$cc,'name'=>$nm,'total'=>0,'tags'=>{}};
+					for($t = 0; $t < @tags; $t++){
+						$Areas{$code}{'tags'}{$tags[$t]} = 0;
+					}
+
+					$geojson = "";
+					open(GEO,$file);
+					while(<GEO>){
+						$line = $_;
+						for($t = 0; $t < @tags; $t++){
+							if($line =~ /\"$tags[$t]\\\"/){
+								$Areas{$code}{'tags'}{$tags[$t]}++;
+								$Areas{$code}{'total'}++;
+							}
+						}
+						$geojson .= $line;
+					}
+					close(GEO);
+
+					# Tidy GeoJSON to remove nulls
+					$geojson =~ s/\, \"[^\"]+\": null//g;
+
+					# Save the cleaned GeoJSON
+					open(GEO,">",$file);
+					print GEO $geojson;
+					close(GEO);
+
+					for($t = 0; $t < @tags; $t++){
+						print "\t$tags[$t] = $Areas{$code}{'tags'}{$tags[$t]}\n";
+					}
+
+				}
+
+				# Print summary stats
+				open(CSV,">",$adir."stats.csv");
+				print CSV "Country,Area ID,Name,Total";
+				for($t = 0; $t < @tags; $t++){ print CSV ",".$tags[$t]; }
+				print CSV "\n";
+				foreach $area (reverse(sort{ $Areas{$a}{'total'} <=> $Areas{$b}{'total'} or $Areas{$a}{'name'} cmp $Areas{$b}{'name'} }(keys(%Areas)))){
+					print CSV $Areas{$area}{'cc'}.",$area,";
+					if($Areas{$area}{'name'}){
+						print CSV ($Areas{$area}{'name'} =~ /\,/ ? "\"$Areas{$area}{'name'}\"" : $Areas{$area}{'name'});
+					}
+					print CSV ",".$Areas{$area}{'total'};
+					for($t = 0; $t < @tags; $t++){
+						print CSV ",".$Areas{$area}{'tags'}{$tags[$t]};
+					}
+					print CSV "\n";
+				}
+				close(CSV);
+
+			}
+			
+		}
+
+	}
+	
 }
 
 # Remove lock file
