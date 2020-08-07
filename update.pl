@@ -81,7 +81,7 @@ $progress = ODILeeds::ProgressBar->new();
 
 $coder = JSON::XS->new->ascii->canonical(1);
 $coderu = JSON::XS->new->utf8->canonical(1);
-open(FILE,$basedir."config.json");
+open(FILE,$basedir.".config");
 $str = join("",<FILE>);
 close(FILE);
 
