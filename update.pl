@@ -218,7 +218,7 @@ if($mode eq "info"){
 
 if($stats || $mode eq "stats"){
 
-	my (%Areas,$f,$adir,$ddir,$taglist,@tagarray,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$bbfile,$clipfile,$spat,$nm,$waste,$recycling);
+	my (%Areas,$f,$adir,$ddir,$taglist,@tagarray,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$bbfile,$clipfile,$spat,$nm,$waste,$recycling,$url);
 
 	if(!$json->{'osm-geojson'} || ($json->{'osm-geojson'} && !-d $json->{'osm-geojson'})){
 
@@ -340,21 +340,35 @@ if($stats || $mode eq "stats"){
 
 				# Print summary stats
 				open(CSV,">",$adir."stats.csv");
+				open(HTML,">",$adir."stats.txt");
 				print CSV "Country,Area ID,Name,Total";
-				for($t = 0; $t < @tagarray; $t++){ print CSV ",".$tagarray[$t]; }
+				print HTML "<table><tr><th>Country</th><th>Area</th><th>Name</th><th>Total</th>";
+				for($t = 0; $t < @tagarray; $t++){
+					print CSV ",".$tagarray[$t];
+					print HTML "<th>".$tagarray[$t]."</th>";
+				}
 				print CSV "\n";
+				print HTML "</tr>";
+				$url = "https://github.com/odileeds/osm-geojson/tree/master/areas/$slice/";
 				foreach $area (reverse(sort{ $Areas{$a}{'total'} <=> $Areas{$b}{'total'} or $Areas{$a}{'name'} cmp $Areas{$b}{'name'} }(keys(%Areas)))){
 					print CSV $Areas{$area}{'cc'}.",$area,";
+					print HTML "<tr><td>$Areas{$area}{'cc'}</td><td><a href=\"$url$Areas{$area}{'cc'}/$area.geojson\">$area</a></td>";
 					if($Areas{$area}{'name'}){
 						print CSV ($Areas{$area}{'name'} =~ /\,/ ? "\"$Areas{$area}{'name'}\"" : $Areas{$area}{'name'});
+						print HTML "<td><a href=\"$url$Areas{$area}{'cc'}/$area.geojson\">$Areas{$area}{'name'}</a></td>";
 					}
 					print CSV ",".$Areas{$area}{'total'};
+					print HTML "<td>$Areas{$area}{'total'}</td>";
 					for($t = 0; $t < @tagarray; $t++){
 						print CSV ",".$Areas{$area}{'tags'}{$tagarray[$t]};
+						print HTML "<td>$Areas{$area}{'tags'}{$tagarray[$t]}</td>";
 					}
 					print CSV "\n";
+					print HTML "</tr>\n";
 				}
+				print HTML "</table>";
 				close(CSV);
+				close(HTML);
 
 			}
 			
