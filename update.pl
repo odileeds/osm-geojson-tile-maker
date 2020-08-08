@@ -77,7 +77,7 @@ if(!`which $ogr`){
 
 $tiler = ODILeeds::Tiler->new();
 $progress = ODILeeds::ProgressBar->new();
-$progress->len(50);
+$progress->len(100);
 
 
 $coder = JSON::XS->new->ascii->canonical(1);
@@ -220,15 +220,16 @@ if($stats || $mode eq "stats"){
 
 	my (%Areas,$f,$adir,$ddir,$taglist,@tagarray,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$bbfile,$clipfile,$spat,$nm,$waste,$recycling);
 
-	if(!$json->{'osm-geojson'} || ($json->{'osm-geojson'} && !-d $json->{'osm-geojson'})){
+	if(!$json->{'osm-geojson'} || ($json->{'osm-geojson'} && !-d $basedir.$json->{'osm-geojson'})){
 
-		print "ERROR: Your config.json needs to contain \"osm-geojson\" which should be the path to the \"osm-geojson\" repository.\n";
+		print "ERROR: Your config.json needs to contain \"osm-geojson\" which should be the path to the \"osm-geojson\" repository ($json->{'osm-geojson'}).\n";
 		exit;
+
 	}else{
 
 		# Find sub directories in areas folder
 		@dirs = ();
-		$ddir = $json->{'osm-geojson'}."boundaries/";
+		$ddir = $basedir.$json->{'osm-geojson'}."boundaries/";
 		print "$ddir\n";
 
 		opendir (DIR,$ddir) or die "Couldn't open directory, $!";
