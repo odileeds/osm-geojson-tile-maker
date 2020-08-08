@@ -88,6 +88,8 @@ close(FILE);
 $json = $coder->decode($str);
 
 
+
+
 if($mode eq "info"){
 	# Filter the main planet file to make each slice
 	for $slice (sort(keys(%{$json->{'layers'}}))){
@@ -109,12 +111,12 @@ if($mode eq "info"){
 			$file = $datadir.$slice.".o5m";
 			if(!-e $file){
 				print "\t$file doesn't exist so we first need to make it from the planet file. Run:\n";
-				print "\t$filter $planet --keep=\"$json->{$slice}{'tags'}\" -v --drop-ways --drop-relations -o=$file\n";
+				print "\t$filter $planet --keep=\"$json->{'layers'}->{$slice}{'tags'}\" -v --drop-ways --drop-relations -o=$file\n";
 				exit;
 			}
 
 			# At this point we want to update the cut-down version
-			$timestamp = getPlanetUpdates($slice,$file,$json->{$slice}{'tags'});
+			$timestamp = getPlanetUpdates($slice,$file,$json->{'layers'}->{$slice}{'tags'});
 
 			
 			# Now we convert the file type into one that ogr2ogr can deal with
@@ -129,8 +131,8 @@ if($mode eq "info"){
 			`$ogr -overwrite --config $ini -skipfailures -f GeoJSON $filegeo $filepbf points`;
 			`sed -i 's/"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },/"lastupdate":"$timestamp",/g' $filegeo `;
 
-			$odir = $json->{$slice}{'odir'}||"./";
-			$zoom = $json->{$slice}{'zoom'}||12;
+			$odir = $json->{'layers'}->{$slice}{'odir'}||"./";
+			$zoom = $json->{'layers'}->{$slice}{'zoom'}||12;
 			if($odir){
 
 				if(!-d $odir){ makedir($odir); }
@@ -185,7 +187,7 @@ if($mode eq "info"){
 				close(FILE);
 				$ntiles = keys(%tiles);
 				$progress->max($ntiles);
-				print "\tSaving $n $slice in $ntiles tiles ($json->{$slice}{'tags'})\n";
+				print "\tSaving $n $slice in $ntiles tiles ($json->{'layers'}->{$slice}{'tags'})\n";
 				$i = 0;
 				foreach $tile (keys(%tiles)){
 					($x,$y) = split(/\//,$tile);
@@ -215,15 +217,14 @@ if($mode eq "info"){
 
 if($stats || $mode eq "stats"){
 
-	my (%Areas,$f,$adir,$ddir,$taglist,@tags,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$bbfile,$clipfile,$spat,$nm,$waste,$recycling);
+	my (%Areas,$f,$adir,$ddir,$taglist,@tagarray,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$bbfile,$clipfile,$spat,$nm,$waste,$recycling);
 
 	if(!$json->{'osm-geojson'} || ($json->{'osm-geojson'} && !-d $json->{'osm-geojson'})){
 
 		print "ERROR: Your config.json needs to contain \"osm-geojson\" which should be the path to the \"osm-geojson\" repository.\n";
 		exit;
 	}else{
-		
-		
+
 		# Find sub directories in areas folder
 		@dirs = ();
 		$ddir = $json->{'osm-geojson'}."boundaries/";
@@ -284,7 +285,7 @@ if($stats || $mode eq "stats"){
 				
 				$taglist = $json->{'layers'}->{$slice}{'tags'};
 				$taglist =~ s/(^|\s)[^\s]*\=/ /g;
-				@tags = split(" ",$taglist);
+				@tagarray = split(" ",$taglist);
 
 				for($f = 0; $f < @files; $f++){
 
@@ -303,17 +304,17 @@ if($stats || $mode eq "stats"){
 					$cc = $files[$f]{'cc'};
 					$nm = $files[$f]{'name'};
 					$Areas{$code} = {'cc'=>$cc,'name'=>$nm,'total'=>0,'tags'=>{}};
-					for($t = 0; $t < @tags; $t++){
-						$Areas{$code}{'tags'}{$tags[$t]} = 0;
+					for($t = 0; $t < @tagarray; $t++){
+						$Areas{$code}{'tags'}{$tagarray[$t]} = 0;
 					}
 
 					$geojson = "";
 					open(GEO,$file);
 					while(<GEO>){
 						$line = $_;
-						for($t = 0; $t < @tags; $t++){
-							if($line =~ /\"$tags[$t]\\\"/){
-								$Areas{$code}{'tags'}{$tags[$t]}++;
+						for($t = 0; $t < @tagarray; $t++){
+							if($line =~ /\"$tagarray[$t]\\\"/){
+								$Areas{$code}{'tags'}{$tagarray[$t]}++;
 								$Areas{$code}{'total'}++;
 							}
 						}
@@ -329,8 +330,8 @@ if($stats || $mode eq "stats"){
 					print GEO $geojson;
 					close(GEO);
 
-					for($t = 0; $t < @tags; $t++){
-						print "\t$tags[$t] = $Areas{$code}{'tags'}{$tags[$t]}\n";
+					for($t = 0; $t < @tagarray; $t++){
+						print "\t$tagarray[$t] = $Areas{$code}{'tags'}{$tagarray[$t]}\n";
 					}
 
 				}
@@ -338,7 +339,7 @@ if($stats || $mode eq "stats"){
 				# Print summary stats
 				open(CSV,">",$adir."stats.csv");
 				print CSV "Country,Area ID,Name,Total";
-				for($t = 0; $t < @tags; $t++){ print CSV ",".$tags[$t]; }
+				for($t = 0; $t < @tagarray; $t++){ print CSV ",".$tagarray[$t]; }
 				print CSV "\n";
 				foreach $area (reverse(sort{ $Areas{$a}{'total'} <=> $Areas{$b}{'total'} or $Areas{$a}{'name'} cmp $Areas{$b}{'name'} }(keys(%Areas)))){
 					print CSV $Areas{$area}{'cc'}.",$area,";
@@ -346,8 +347,8 @@ if($stats || $mode eq "stats"){
 						print CSV ($Areas{$area}{'name'} =~ /\,/ ? "\"$Areas{$area}{'name'}\"" : $Areas{$area}{'name'});
 					}
 					print CSV ",".$Areas{$area}{'total'};
-					for($t = 0; $t < @tags; $t++){
-						print CSV ",".$Areas{$area}{'tags'}{$tags[$t]};
+					for($t = 0; $t < @tagarray; $t++){
+						print CSV ",".$Areas{$area}{'tags'}{$tagarray[$t]};
 					}
 					print CSV "\n";
 				}
