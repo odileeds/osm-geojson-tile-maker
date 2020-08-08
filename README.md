@@ -181,3 +181,18 @@ Some representative file sizes:
 We can find the largest (bytes) GeoJSON tiles:
 
 `find . -printf '%s %p\n'|sort -nr|head`
+
+To calculate area statistics we need some areas. Download the [UK Local Authority Districts (May 2020)](https://geoportal.statistics.gov.uk/datasets/local-authority-districts-may-2020-boundaries-uk-bfe) from ONS as [a Shapefile](https://prod-hub-indexer.s3.amazonaws.com/files/7f83b82ef6ce46d3a5635d371e8a3e7c/0/full/27700/7f83b82ef6ce46d3a5635d371e8a3e7c_0_full_27700.zip) and extract it into `geo/`. Create the SQlite file from the UK LAD Shapefile in QGIS with spatial indexing and convert the coordinates to WGS84.
+
+
+`ogr2ogr -f "SQLite" bins.sqlite bins.osm.pbf -clipsrc -8.650007 49.864637 1.768912 60.860766`                                                         `
+
+`ogrinfo bins.shp/points.shp -sql "CREATE SPATIAL INDEX ON points" `
+
+Output 
+
+`ogr2ogr -f 'ESRI Shapefile' output.shp -dialect sqlite -sql "SELECT COUNT(*) FROM lad, bins WHERE ST_Intersects(lad.geometry,bins.geometry) GROUP BY lad.lad20cd" input.vrt`
+
+Get cultural boundaries from [Natural Earth](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/ http://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/) or [country boundaries from the World Bank](https://datacatalog.worldbank.org/dataset/world-bank-official-boundaries) (CC-BY 4.0) and convert these:
+
+
