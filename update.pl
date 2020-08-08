@@ -77,6 +77,7 @@ if(!`which $ogr`){
 
 $tiler = ODILeeds::Tiler->new();
 $progress = ODILeeds::ProgressBar->new();
+$progress->len(50);
 
 
 $coder = JSON::XS->new->ascii->canonical(1);
