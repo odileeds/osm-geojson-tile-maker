@@ -47,11 +47,11 @@ sudo apt update
 sudo apt full-upgrade
 ```
 
-Next we will install git
+Next we will install git (if it isn't already installed):
 
 `sudo apt install git`
 
-You may also wish to set up the Raspberry Pi for "headless" SSH access and create an SSH key for use on Github.
+You may also wish to set up the Raspberry Pi for "headless" SSH access (enable SSH in `raspi-config`) and [generate an SSH key for use on Github](https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
 
 #### External drive
 
@@ -196,3 +196,80 @@ Output
 Get cultural boundaries from [Natural Earth](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/ http://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/) or [country boundaries from the World Bank](https://datacatalog.worldbank.org/dataset/world-bank-official-boundaries) (CC-BY 4.0) and convert these:
 
 
+### Setting up SleepyPi
+
+First we follow the [SleepyPi setup instructions](https://spellfoundry.com/docs/sleepy-pi-2-getting-started/):
+
+```
+sudo apt update
+sudo apt full-update
+
+wget https://raw.githubusercontent.com/SpellFoundry/Sleepy-Pi-Setup/master/Sleepy-Pi-Setup.sh
+chmod +x Sleepy-Pi-Setup.sh
+sudo ./Sleepy-Pi-Setup.sh
+```
+
+Next we have to [set-up the real-time clock](https://spellfoundry.com/sleepy-pi/setting-up-the-real-time-clock-on-raspbian-jessie/) (RTC):
+
+```
+i2cdetect -y 1
+```
+
+This should output something that looks like:
+
+```
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- 24 -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- 68 -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+```
+
+Add the line `dtoverlay=i2c-rtc,pcf8523` to the bottom of `/boot/config.txt`. Next edit `hwclock-set`:
+
+```
+sudo nano /lib/udev/hwclock-set
+```
+
+and comment out the following lines
+
+```
+#if [ -e /run/systemd/system ] ; then 
+#   exit 0
+#fi
+```
+
+Also 
+
+```
+if [ yes - "$BADYEAR" ] ; then 
+#  /sbin/hwclock --rtc=$dev --systz --badyear
+  /sbin/hwclock --rtc=$dev --hctosys --badyear
+else
+#  /sbin/hwclock --rtc=$dev --systz --badyear
+  /sbin/hwclock --rtc=$dev --hctosys
+fi
+```
+
+Read from the hardware clock:
+
+`sudo hwclock -r`
+
+
+Next the mechanism for updating the time over the network is NTP or Network Time Protocol. Disable this by doing:
+
+```
+sudo systemctl stop ntp.service
+sudo systemctl disable ntp.service
+```
+
+These two steps should do the trick, but if it’s also a good idea to disable the “fake hwclock” (after all, we have a real one!). Disable this by doing:
+
+```
+sudo systemctl stop fake-hwclock.service
+sudo systemctl disable fake-hwclock.service
+```
