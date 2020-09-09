@@ -294,7 +294,11 @@ if($stats || $mode eq "stats"){
 				@tagarray = split(" ",$taglist);
 
 				for($f = 0; $f < @files; $f++){
-
+					# Make the country directory if it doesn't exist
+					if(!-d $adir.$files[$f]{'cc'}."/"){
+						print "Making $adir$files[$f]{'cc'}/\n";
+						`mkdir .$adir$files[$f]{'cc'}/`;
+					}
 					$file = $adir.$files[$f]{'cc'}."/".$files[$f]{'code'}.".geojson";
 
 					print "Processing $files[$f]{'cc'}/$files[$f]{'code'} - $files[$f]{'name'}\n";
