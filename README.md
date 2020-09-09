@@ -135,20 +135,28 @@ where `DIR` is a directory on the external SSD to use for temporary files. This 
 
 We are now ready for daily updates. Because the process of merging daily updates for the entire planet and then filtering the entire planet for the tags we want takes many hours, we have taken a different approach. We pre-filter the world (`osmfilter`) then filter each of the daily change files (`osmfilter`) and then use `osmconvert` to combine these much smaller changes into the filtered planet file. Doing it this way is much quicker each day.
 
-First we use `config.json` to specify the layers we are making:
+First we create a `.config` file to specify the layers we are making:
 
 ```json
 {
-	"bins": {
-		"make": true,
-		"tags": "amenity=waste_basket =recycling",
-		"odir": "../osm-geojson/tiles/bins/",
-		"zoom": 12
+	"osm-geojson": "../osm-geojson/",
+	"layers": {
+		"bins": {
+			"make": true,
+			"tags": "amenity=waste_basket =recycling =waste_disposal",
+			"odir": "../osm-geojson/tiles/bins/",
+			"zoom": 12
+		}
 	}
 }
 ```
 
-The `tags` key contains the `osmfilter` format tags you wish to keep; in this case `amenity=waste_basket` and `amenity=recycling`. `odir` is the directory to save the resulting GeoJSON tiles to - in this case we are saving to the ODI Leeds [osm-geojson repo](https://github.com/odileeds/osm-geojson). We set up a cronjob to run the following command once a day:
+where `osm-geojson` is the path to the output directory and layers contains unique layer types. In this example we have created a `bins` layer with the following properties:
+  * `tags` contains the `osmfilter` format tags you wish to keep; in this case `amenity=waste_basket`, `amenity=recycling`, and `amenity=waste_disposal`;
+  * `odir` is the directory to save the resulting GeoJSON tiles to - in this case we are saving to the ODI Leeds [osm-geojson repo](https://github.com/odileeds/osm-geojson);
+  * `make` sets if we bother processing this layer (useful if you want to define it but not make it).
+
+We set up a cronjob to run the following command once a day:
 
 `perl /PATH/TO/update.pl -mode update`
 
@@ -172,9 +180,9 @@ As of 2020-07-31 this took 8m12s to do a daily update on a Raspberry Pi 4. It fo
 Some representative file sizes:
 
 * `planet.o5m` - 108 GB
-* `bins.o5m` - 20 MB
-* `bins.osm.pbf` - 13 MB
-* `bins.geojson` - 150 MB
+* `bins.o5m` - 24 MB
+* `bins.osm.pbf` - 16 MB
+* `bins.geojson` - 173 MB
 * `2879.osc.gz` - 101 MB (daily changes)
 * `2879-bins.osc` - 108 kB (daily changes - bins)
 
