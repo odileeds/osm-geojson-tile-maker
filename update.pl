@@ -124,14 +124,17 @@ if($mode eq "info"){
 			$filepbf = $datadir.$slice.".osm.pbf";
 			$filegeo = $datadir.$slice.".geojson";
 
-			print "\tCreating GeoJSON output...\n";
-			if(-e $filegeo){
-				`rm $filegeo`;
+
+			if(!$json->{'layers'}->{$slice}{'makedb'}){
+				print "\tCreating GeoJSON output...\n";
+				if(-e $filegeo){
+					`rm $filegeo`;
+				}
+				`$convert $file -o=$filepbf`;
+				`$ogr -overwrite --config $ini -skipfailures -f GeoJSON $filegeo $filepbf points`;
+				# No need to spend time updating the timestamp by writing big files to disk
+				#`sed -i 's/"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },/"lastupdate":"$timestamp",/g' $filegeo `;
 			}
-			`$convert $file -o=$filepbf`;
-			`$ogr -overwrite --config $ini -skipfailures -f GeoJSON $filegeo $filepbf points`;
-			# No need to spend time updating the timestamp by writing big files to disk
-			#`sed -i 's/"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },/"lastupdate":"$timestamp",/g' $filegeo `;
 
 			$odir = ($json->{'osm-geojson'}||"./")."tiles/$slice/";
 			$zoom = $json->{'layers'}->{$slice}{'zoom'}||12;
