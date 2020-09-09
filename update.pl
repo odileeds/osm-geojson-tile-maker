@@ -24,7 +24,7 @@ use ODILeeds::ProgressBar;
 use ODILeeds::Tiler;
 
 
-my (%data,$i,$k,$v,$json,$jsonbit,$coder,$coderu,$str,$slice,$timestamp,$convert,$filter,$planet,$mode,$stats,$file,$filepbf,$filegeo,$ogr,@lines,$line,$tiler,%tiles,@types,$n,$zoom,$odir,$ini,@props,$p,$x,$y,$t,$feature,$tile,$ntiles,$progress);
+my (%data,%zip,$i,$k,$v,$json,$jsonbit,$coder,$coderu,$str,$slice,$timestamp,$convert,$filter,$planet,$mode,$stats,$file,$filepbf,$filegeo,$ogr,@lines,$line,$tiler,%tiles,@types,$n,$zoom,$odir,$ini,@props,$p,$x,$y,$t,$feature,$tile,$ntiles,$progress);
 
 my $datadir = $basedir."osm/";
 my $tempdir = $basedir."temp/";
@@ -378,16 +378,29 @@ if($stats || $mode eq "stats"){
 	
 }
 
+# Zip up the files
+zipFiles();
+
 # Remove lock file
 `rm $basedir.osm_lock`;
 
-
-#`osmfilter planet.o5m --keep="amenity=waste_basket =recycling" -v --drop-ways --drop-relations -o=bins.o5m`;
 
 
 
 
 ##########################
+sub zipFiles {
+	my ($cfile);
+	foreach $cfile (sort(keys(%zip))){
+		if(!-e "$cfile.gz"){
+			print "\tZipping file back up ($cfile)\n";
+			`gzip "$cfile"`;
+		}else{
+			print "\t$cfile.gz is zipped\n";
+		}
+	}
+}
+
 sub getPlanetUpdates {
 	# Download state
 	my ($file,$line,$seq,$tstamp,$timestamp,@lines,$s,$t,$url,$cfile,$sfile,$processfiles,$tags,$slice,$ofile,$newest);
@@ -446,6 +459,7 @@ sub getPlanetUpdates {
 						}
 						print "\tGunzipping $cfile.gz\n";
 						`gunzip "$cfile.gz"`;
+						$zip{$cfile} = 1;
 					}
 					print "-> $seq, $tstamp ".getPlanetBaseUrlFromState($seq).".osc\n";
 					# Now we need to filter the change file
@@ -453,12 +467,13 @@ sub getPlanetUpdates {
 						print "\tFiltering $cfile to $sfile.\n";
 						`$filter $cfile --keep="$tags" -v --drop-ways --drop-relations -o=$sfile`;
 					}
-					if(!-e "$cfile.gz"){
-						print "\tZipping file back up ($cfile)\n";
-						`gzip "$cfile"`;
-					}else{
-						print "\t$cfile.gz is zipped\n";
-					}
+					# This step is now done afterwards to avoid unzip/zip steps
+					#if(!-e "$cfile.gz"){
+					#	print "\tZipping file back up ($cfile)\n";
+					#	`gzip "$cfile"`;
+					#}else{
+					#	print "\t$cfile.gz is zipped\n";
+					#}
 				}
 				$processfiles = $sfile.($processfiles ? " ":"").$processfiles;
 			}
