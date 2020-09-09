@@ -222,7 +222,7 @@ if($mode eq "info"){
 
 if($stats || $mode eq "stats"){
 
-	my (%Areas,$f,$adir,$ddir,$taglist,@tagarray,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$bbfile,$clipfile,$spat,$nm,$waste,$recycling,$url);
+	my (%Areas,$f,$adir,$ddir,$taglist,@tagarray,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$ccspat,$ccspatcomma,$bbfile,$clipfile,$spat,$nm,$waste,$recycling,$url,$filecc,$filetmp);
 
 	if(!$json->{'osm-geojson'} || ($json->{'osm-geojson'} && !-d $json->{'osm-geojson'})){
 
@@ -240,7 +240,34 @@ if($stats || $mode eq "stats"){
 		while ($cc = readdir DIR){
 			if(-d $ddir.$cc && -d $ddir.$cc && $cc !~ /^\.+$/){
 				#push(@countries,{ 'dir'=>$ddir$cc,'code'=>$file});
-				print "$cc\n";
+				$ccspat = "";
+				$ccspatcomma = "";
+				$bbfile = $ddir.$cc.".yaml";
+				if(-e $bbfile){
+					open(BOUNDS,$bbfile);
+					@lines = <BOUNDS>;
+					close(BOUNDS);
+					foreach $line (@lines){
+						$line =~ s/[\n\r]//g;
+						if($line =~ /BOUNDS: +(.*)/){
+							$ccspat = "$1";
+						}
+					}
+				}
+				print "$cc $ccspat\n";
+				if($ccspat){
+					$ccspatcomma = $ccspat;
+					$ccspatcomma =~ s/ /\,/g;
+					for $slice (sort(keys(%{$json->{'layers'}}))){
+						if($json->{'layers'}->{$slice}{'stats'}){
+							$file = $datadir.$slice.".o5m";
+							$filepbf = $datadir.$slice."-$cc.osm.pbf";
+							print "Make country bounding-box file for $slice ($file - $filepbf).\n";
+							`$convert $file -b=$ccspatcomma -o=$filepbf`;
+						}
+					}
+				}
+				
 				opendir(SUBDIR,$ddir.$cc) or die "Couldn't open directory, $!";
 				while($file = readdir SUBDIR){
 					if($file =~ /^(.*).geojson/){
@@ -256,7 +283,7 @@ if($stats || $mode eq "stats"){
 							foreach $line (@lines){
 								$line =~ s/[\n\r]//g;
 								if($line =~ /BOUNDS: +(.*)/){
-									$spat = "-spat $1";
+									$spat = "$1";
 								}elsif($line =~ /NAME: +(.*)/){
 									$nm = $1;
 								}
@@ -266,7 +293,7 @@ if($stats || $mode eq "stats"){
 							print "\tNo spatial bounds provided for $code (this may be slow)\n";
 						}
 						
-						push(@files,{'code'=>$code,'geojson'=>$clipfile,'cc'=>$cc,'yaml'=>$bbfile,'bounds'=>$spat,'name'=>$nm});
+						push(@files,{'cc'=>$cc,'b'=>$spat,'code'=>$code,'geojson'=>$clipfile,'yaml'=>$bbfile,'bounds'=>($spat ? "-spat $spat":""),'name'=>$nm});
 					}
 				}
 				closedir(SUBDIR);
@@ -281,8 +308,6 @@ if($stats || $mode eq "stats"){
 
 				undef %Areas;
 			
-				$filepbf = $datadir.$slice.".osm.pbf";
-
 				$adir = $json->{'osm-geojson'}."areas/$slice/";
 				if(!-d $adir){
 					print "Making $adir\n";
@@ -294,21 +319,39 @@ if($stats || $mode eq "stats"){
 				@tagarray = split(" ",$taglist);
 
 				for($f = 0; $f < @files; $f++){
+
+					if(-e $datadir.$slice."-".$files[$f]{'cc'}.".osm.pbf"){
+						$filepbf = $datadir.$slice."-".$files[$f]{'cc'}.".osm.pbf";
+					}else{
+						$filepbf = $datadir.$slice.".osm.pbf";
+					}
+					
 					# Make the country directory if it doesn't exist
 					if(!-d $adir.$files[$f]{'cc'}."/"){
 						print "Making $adir$files[$f]{'cc'}/\n";
-						`mkdir .$adir$files[$f]{'cc'}/`;
+						`mkdir $adir$files[$f]{'cc'}/`;
 					}
 					$file = $adir.$files[$f]{'cc'}."/".$files[$f]{'code'}.".geojson";
 
-					print "Processing $files[$f]{'cc'}/$files[$f]{'code'} - $files[$f]{'name'}\n";
-					print "\tOutput = $file\n";
-					print "\tBoundary file = $files[$f]{'geojson'}\n";
-					print "\tBounds = $files[$f]{'bounds'}\n";
+					if($json->{'layers'}->{$slice}{'areas'}){
 
-					# Remove any existing version
-					if(-e $file){ `rm $file`; }
-					`ogr2ogr -f GeoJSON $file $files[$f]{'bounds'} -clipsrc "$files[$f]{'geojson'}" -skipfailures $filepbf points`;
+						print "Processing $files[$f]{'cc'}/$files[$f]{'code'} - $files[$f]{'name'} (from $filepbf)\n";
+						print "\tOutput = $file\n";
+						print "\tBoundary file = $files[$f]{'geojson'}\n";
+						print "\tBounds = $files[$f]{'bounds'}\n";
+
+						# Remove any existing version
+						if(-e $file){ `rm $file`; }
+
+						# Cut-down the country file down to the bounding box
+						$filetmp = $datadir.$slice."-temp.osm.pbf";
+						if(-e $filetmp){ `rm $filetmp`; } # Remove any existing version
+						$files[$f]{'b'} =~ s/\s/\,/g;	# Replace spaces with commas
+						`$convert $filepbf -b=$files[$f]{'b'} -o=$filetmp`;
+
+						# Clip to the boundary
+						`ogr2ogr -f GeoJSON $file -clipsrc "$files[$f]{'geojson'}" -skipfailures $filetmp points`;
+					}
 
 					$code = $files[$f]{'code'};
 					$cc = $files[$f]{'cc'};
