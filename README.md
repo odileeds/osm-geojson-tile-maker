@@ -135,7 +135,7 @@ where `DIR` is a directory on the external SSD to use for temporary files. This 
 
 We are now ready for daily updates. Because the process of merging daily updates for the entire planet and then filtering the entire planet for the tags we want takes many hours, we have taken a different approach. We pre-filter the world (`osmfilter`) then filter each of the daily change files (`osmfilter`) and then use `osmconvert` to combine these much smaller changes into the filtered planet file. Doing it this way is much quicker each day.
 
-First we use `config.json` to specify the layers we are making:
+First we create a `.config` file to specify the layers we are making:
 
 ```json
 {
