@@ -135,7 +135,7 @@ if($mode eq "info"){
 
 			$odir = ($json->{'osm-geojson'}||"./")."tiles/$slice/";
 			$zoom = $json->{'layers'}->{$slice}{'zoom'}||12;
-			if($odir){
+			if($odir && $json->{'layers'}->{$slice}{'tiles'}){
 
 				if(!-d $odir){ makedir($odir); }
 				if(!-d $odir.$zoom){ makedir($odir.$zoom); }
