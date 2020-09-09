@@ -125,7 +125,7 @@ if($mode eq "info"){
 			$filegeo = $datadir.$slice.".geojson";
 
 
-			if(!$json->{'layers'}->{$slice}{'makedb'}){
+			if(!$json->{'layers'}->{$slice}{'skipdb'}){
 				print "\tCreating GeoJSON output...\n";
 				if(-e $filegeo){
 					`rm $filegeo`;
