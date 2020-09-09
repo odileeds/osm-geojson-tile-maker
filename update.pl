@@ -132,7 +132,7 @@ if($mode eq "info"){
 			`$ogr -overwrite --config $ini -skipfailures -f GeoJSON $filegeo $filepbf points`;
 			`sed -i 's/"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },/"lastupdate":"$timestamp",/g' $filegeo `;
 
-			$odir = $json->{'layers'}->{$slice}{'odir'}||"./";
+			$odir = ($json->{'osm-geojson'}||"./")."tiles/$slice/";
 			$zoom = $json->{'layers'}->{$slice}{'zoom'}||12;
 			if($odir){
 
