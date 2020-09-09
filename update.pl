@@ -222,7 +222,7 @@ if($stats || $mode eq "stats"){
 
 	if(!$json->{'osm-geojson'} || ($json->{'osm-geojson'} && !-d $json->{'osm-geojson'})){
 
-		print "ERROR: Your config.json needs to contain \"osm-geojson\" which should be the path to the \"osm-geojson\" repository ($json->{'osm-geojson'}).\n";
+		print "ERROR: Your .config needs to contain \"osm-geojson\" which should be the path to the \"osm-geojson\" repository ($json->{'osm-geojson'}).\n";
 		exit;
 
 	}else{
