@@ -274,7 +274,7 @@ if($stats || $mode eq "stats"){
 		for $slice (sort(keys(%{$json->{'layers'}}))){
 			print "$slice:\n";
 			
-			if($json->{'layers'}->{$slice}{'make'}){
+			if($json->{'layers'}->{$slice}{'stats'}){
 
 				undef %Areas;
 			
