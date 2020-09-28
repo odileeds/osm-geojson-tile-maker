@@ -222,7 +222,7 @@ if($mode eq "info"){
 
 if($stats || $mode eq "stats"){
 
-	my (%Areas,$f,$adir,$ddir,$taglist,@tagarray,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$ccspat,$ccspatcomma,$bbfile,$clipfile,$spat,$nm,$waste,$recycling,$url,$filecc,$filetmp);
+	my (%Areas,$f,$adir,$ddir,$taglist,@tagarray,$t,@dirs,@countries,$cc,$dir,@files,$afile,$code,$area,$geojson,$ccspat,$ccspatcomma,$bbfile,$clipfile,$polyfile,$spat,$nm,$waste,$recycling,$url,$filecc,$filetmp);
 
 	if(!$json->{'osm-geojson'} || ($json->{'osm-geojson'} && !-d $json->{'osm-geojson'})){
 
@@ -273,6 +273,7 @@ if($stats || $mode eq "stats"){
 					if($file =~ /^(.*).geojson/){
 						$code = $1;
 						$bbfile = $ddir.$cc."/".$1.".yaml";
+						$polyfile = $ddir.$cc."/".$1.".poly";
 						$clipfile = $ddir.$cc."/".$file;
 						$spat = "";
 						$nm = "";
@@ -293,7 +294,7 @@ if($stats || $mode eq "stats"){
 							print "\tNo spatial bounds provided for $code (this may be slow)\n";
 						}
 						
-						push(@files,{'cc'=>$cc,'b'=>$spat,'code'=>$code,'geojson'=>$clipfile,'yaml'=>$bbfile,'bounds'=>($spat ? "-spat $spat":""),'name'=>$nm});
+						push(@files,{'cc'=>$cc,'b'=>$spat,'code'=>$code,'geojson'=>$clipfile,'poly'=>$polyfile,'yaml'=>$bbfile,'bounds'=>($spat ? "-spat $spat":""),'name'=>$nm});
 					}
 				}
 				closedir(SUBDIR);
@@ -339,18 +340,28 @@ if($stats || $mode eq "stats"){
 						print "\tOutput = $file\n";
 						print "\tBoundary file = $files[$f]{'geojson'}\n";
 						print "\tBounds = $files[$f]{'bounds'}\n";
+						print "\tPoly file = $files[$f]{'poly'}\n";
 
 						# Remove any existing version
 						if(-e $file){ `rm $file`; }
 
-						# Cut-down the country file down to the bounding box
-						$filetmp = $datadir.$slice."-temp.osm.pbf";
-						if(-e $filetmp){ `rm $filetmp`; } # Remove any existing version
-						$files[$f]{'b'} =~ s/\s/\,/g;	# Replace spaces with commas
-						`$convert $filepbf -b=$files[$f]{'b'} -o=$filetmp`;
+#						# Cut-down the country file down to the bounding box
+#						$filetmp = $datadir.$slice."-temp.osm.pbf";	
+#						if(-e $filetmp){ `rm $filetmp`; } # Remove any existing version
+#						$files[$f]{'b'} =~ s/\s/\,/g;	# Replace spaces with commas
+#						`$convert $filepbf -b=$files[$f]{'b'} -o=$filetmp`;
+#
+#						# Clip to the boundary
+#						`ogr2ogr -f GeoJSON $file -clipsrc "$files[$f]{'geojson'}" -skipfailures $filetmp points`;
 
-						# Clip to the boundary
-						`ogr2ogr -f GeoJSON $file -clipsrc "$files[$f]{'geojson'}" -skipfailures $filetmp points`;
+						# Create a temporary PBF for this area
+						$filetmp = $datadir.$slice."-temp.osm.pbf";	
+						`rm $filetmp`;
+						# Clip to the poly file
+						`$convert $filepbf -B=$files[$f]{'poly'} -o=$filetmp`;
+						# Convert to GeoJSON
+						`ogr2ogr -f GeoJSON $file -skipfailures $filetmp points`;
+						
 					}
 
 					$code = $files[$f]{'code'};
