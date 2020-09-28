@@ -24,7 +24,7 @@ use ODILeeds::ProgressBar;
 use ODILeeds::Tiler;
 
 
-my (%data,%zip,$i,$k,$v,$json,$jsonbit,$coder,$coderu,$str,$slice,$timestamp,$convert,$filter,$planet,$mode,$stats,$file,$filepbf,$filegeo,$ogr,@lines,$line,$tiler,%tiles,@types,$n,$zoom,$odir,$ini,@props,$p,$x,$y,$t,$feature,$tile,$ntiles,$progress);
+my (%data,%zip,$i,$k,$v,$json,$jsonbit,$coder,$coderu,$str,$slice,$timestamp,$convert,$filter,$planet,$mode,$stats,$file,$filepbf,$filegeo,$ogr,@lines,$line,$tiler,%tiles,@types,$n,$zoom,$odir,$ini,@props,$p,$x,$y,$t,$feature,$tile,$ntiles,$progress,$temp,$byte,$bytes,@sorttiles);
 
 my $datadir = $basedir."osm/";
 my $tempdir = $basedir."temp/";
@@ -81,7 +81,7 @@ $progress->len(100);
 
 
 $coder = JSON::XS->new->ascii->canonical(1);
-$coderu = JSON::XS->new->utf8->canonical(1);
+$coderu = JSON::XS->new->utf8->canonical(1)->allow_nonref(1);
 open(FILE,$basedir.".config");
 $str = join("",<FILE>);
 close(FILE);
@@ -124,7 +124,6 @@ if($mode eq "info"){
 			$filepbf = $datadir.$slice.".osm.pbf";
 			$filegeo = $datadir.$slice.".geojson";
 
-
 			if(!$json->{'layers'}->{$slice}{'skipdb'}){
 				print "\tCreating GeoJSON output...\n";
 				if(-e $filegeo){
@@ -141,12 +140,23 @@ if($mode eq "info"){
 			if($odir && $json->{'layers'}->{$slice}{'tiles'}){
 
 				if(!-d $odir){ makedir($odir); }
+				if(-d $odir.$zoom){
+					print "\tRemoving tiles...";
+					`rm -Rf $odir$zoom/*`;
+					print "done.\n";
+				}
 				if(!-d $odir.$zoom){ makedir($odir.$zoom); }
 					
 				$n = `sed -n '\$=' $filegeo`;
 				$n =~ s/[\n\r]//g;
+				print "\tThere are $n lines to process.\n";
+				$bytes = 0;
 				$i = 0;
 				$progress->max($n-1);
+
+				# Clear the tiles
+				undef %tiles;
+
 				print "\tProcessing $filegeo\n";
 				open(FILE,$filegeo);
 				while(<FILE>){
@@ -156,59 +166,102 @@ if($mode eq "info"){
 						$line =~ s/\,$//g;
 						# Remove nulls
 						$line =~ s/, \"([^\"]*)\": null//g;
-						$jsonbit = $coder->decode($line);
 						if($line){
+							$jsonbit = $coder->decode($line);
+
 							# Clean up 'other_tags'
 							if($jsonbit->{'properties'}->{'other_tags'}){
-								if($jsonbit->{'properties'}->{'other_tags'}){
-									# Turn into JSON
-									$jsonbit->{'properties'}->{'other_tags'} =~ s/\=\>/\:/g;
-									# Escape newlines
-									$jsonbit->{'properties'}->{'other_tags'} =~ s/[\n\r]/\\n/g;
-									$jsonbit->{'properties'}->{'tag'} = $coderu->decode("{".$jsonbit->{'properties'}->{'other_tags'}."}");
+
+								# Turn into JSON
+								$jsonbit->{'properties'}->{'other_tags'} =~ s/\=\>/\:/g;
+
+								# Replace non-escaped newlines/tabs with spaces
+								$jsonbit->{'properties'}->{'other_tags'} =~ s/[\n\r\t]+/ /g;
+
+								if($jsonbit->{'properties'}->{'other_tags'} =~ /\:/){
+									$jsonbit->{'properties'}->{'tag'} = $coder->decode("{".$jsonbit->{'properties'}->{'other_tags'}."}");
 								}
 								# Remove original group
 								delete $jsonbit->{'properties'}->{'other_tags'};
 							}
+
+							# Truncate coordinates to 6dp (~11cm)
+							$jsonbit->{'geometry'}->{'coordinates'}[0] =~ s/([0-9]\.[0-9]{6}).*/$1/g;
+							$jsonbit->{'geometry'}->{'coordinates'}[1] =~ s/([0-9]\.[0-9]{6}).*/$1/g;
+							$jsonbit->{'geometry'}->{'coordinates'}[0] += 0;
+							$jsonbit->{'geometry'}->{'coordinates'}[1] += 0;
+							($x,$y) = $tiler->project($jsonbit->{'geometry'}->{'coordinates'}[1],$jsonbit->{'geometry'}->{'coordinates'}[0],$zoom);
+							$t = $x."/".$y;
+							if(!$tiles{$t}){
+								$tiles{$t} = {'n'=>0,'file'=>"$odir$zoom/$t.geojson","str"=>"","started"=>0,"bytes"=>0};
+								# Create the Z/X directory if it doesn't already exist
+								if(!-d $odir.$zoom."/$x"){
+									`mkdir $odir$zoom/$x`;
+								}
+							}
+							$feature = $coder->encode($jsonbit);
+							$feature =~ s/\,\"tag\":\{\}//g;
+							$temp = ($tiles{$t}{'n'} > 0 ? ",\n":"")."\t".$feature;
+							$tiles{$t}{"str"} .= $temp;
+							$byte = length($temp);
+							$tiles{$t}{"bytes"} += $byte;
+							$bytes += $byte;
+							$tiles{$t}{'n'}++;
+							# If the amount in memory gets too big we will save the biggest files
+							if($bytes > 400e6){
+								print "\tReducing memory usage\n";
+								@sorttiles = reverse(sort{ $tiles{$a}{'bytes'} <=> $tiles{$b}{'bytes'} }(keys(%tiles)));
+								$t = 0;
+								while($bytes > 200e6){
+									$tile = $sorttiles[$t];
+									$str = "";
+									if($tiles{$tile}{'started'} == 0){
+										$str .= "{\n\"type\": \"FeatureCollection\",\n\"features\": [\n".$tiles{$tile}{"str"};
+										$tiles{$tile}{'started'} = 1;
+									}
+									open(GEO,">>",$tiles{$tile}{'file'});
+									print GEO $str;
+									close(GEO);
+									# Now remove the bytes
+									$tiles{$tile}{"str"} = "";
+									$bytes -= $tiles{$tile}{"bytes"};
+									$tiles{$tile}{"bytes"} = 0;
+									$t++;
+								}
+							}
+
 						}else{
 							print "No line for $n ($line)\n";
 						}
-						# Truncate coordinates to 6dp (~11cm)
-						$jsonbit->{'geometry'}->{'coordinates'}[0] =~ s/([0-9]\.[0-9]{6}).*/$1/g;
-						$jsonbit->{'geometry'}->{'coordinates'}[1] =~ s/([0-9]\.[0-9]{6}).*/$1/g;
-						$jsonbit->{'geometry'}->{'coordinates'}[0] += 0;
-						$jsonbit->{'geometry'}->{'coordinates'}[1] += 0;
-						($x,$y) = $tiler->project($jsonbit->{'geometry'}->{'coordinates'}[1],$jsonbit->{'geometry'}->{'coordinates'}[0],$zoom);
-						$t = $x."/".$y;
-						if(!$tiles{$t}){ $tiles{$t} = ""; }
-						$feature = $coder->encode($jsonbit);
-						$feature =~ s/\,\"tag\":\{\}//g;
-						$tiles{$t} .= ($tiles{$t} ? ",\n":"")."\t".$feature;
 					}
 					$i++;
 					$progress->update($i,"\t");
 				}
-				$n = $i;
 				close(FILE);
+
+				$n = $i;
 				$ntiles = keys(%tiles);
 				$progress->max($ntiles);
-				print "\tSaving $n $slice in $ntiles tiles ($json->{'layers'}->{$slice}{'tags'})\n";
+
+				print "\tClosing $n $slice in $ntiles tiles ($json->{'layers'}->{$slice}{'tags'})\n";
 				$i = 0;
 				foreach $tile (keys(%tiles)){
-					($x,$y) = split(/\//,$tile);
-					if(!-d $odir.$zoom."/$x"){
-						`mkdir $odir$zoom/$x`;
+
+					open(GEO,">>",$tiles{$tile}{'file'});
+					if($tiles{$tile}{'started'} == 0){
+						print GEO "{\n";
+						print GEO "\"type\": \"FeatureCollection\",\n";
+						print GEO "\"features\": [\n";
+						$tiles{$tile}{'started'} = 1;
 					}
-					$file = "$odir$zoom/$tile.geojson";
-					open(FILE,">",$file);
-					print FILE "{\n";
-					print FILE "\"type\": \"FeatureCollection\",\n";
-					#print FILE "\"lastupdate\": \"".$timestamp."\",\n";
-					print FILE "\"features\": [\n";
-					print FILE "$tiles{$tile}\n";
-					print FILE "]\n";
-					print FILE "}\n";
-					close(FILE);
+					if($tiles{$tile}{'str'}){
+						print GEO $tiles{$tile}{'str'};
+						# Free up memory
+						delete $tiles{$tile}{'str'};
+					}
+					print GEO "\n]\n";
+					print GEO "}\n";
+					close(GEO);
 					$i++;
 					$progress->update($i,"\t");
 				}
